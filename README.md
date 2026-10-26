@@ -1,6 +1,8 @@
-# POS System
+# Multi-shop POS System
 
-Advanced custom Point of Sale system built for a clothing/underwear wholesale & retail business.
+Multi-shop evolution of the Sackey Point of Sale system for clothing/underwear wholesale and retail businesses. Each future owner account will have an isolated shop workspace with its own products, customers, sales, payments, inventory, reports, and workers.
+
+The original Sackey workflows are preserved as the starting point. The first multi-shop foundation is documented in [`docs/multi-shop-foundation.md`](docs/multi-shop-foundation.md).
 
 ## Tech Stack
 - **Frontend**: React + TypeScript + Vite + Tailwind CSS

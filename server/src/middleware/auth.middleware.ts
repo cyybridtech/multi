@@ -44,14 +44,14 @@ export const authenticate = async (
   try {
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      select: { name: true, role: true, isActive: true },
+      select: { name: true, role: true, isActive: true, shopId: true },
     });
     if (!user || !user.isActive || user.role !== decoded.role) {
       res.status(401).json({ success: false, error: 'Invalid or expired token' });
       return;
     }
 
-    req.user = { userId: decoded.userId, name: user.name, role: user.role } satisfies JwtPayload;
+    req.user = { userId: decoded.userId, name: user.name, role: user.role, shopId: user.shopId } satisfies JwtPayload;
     next();
   } catch (err) {
     next(err);

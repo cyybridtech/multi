@@ -12,6 +12,7 @@ export interface JwtPayload {
   userId: number;
   role: Role;
   name: string;
+  shopId?: number | null;
 }
 
 // Re-export prisma enums for convenience

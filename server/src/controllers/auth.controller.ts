@@ -32,7 +32,7 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
 
     const secret = process.env.JWT_SECRET || 'pos-default-jwt-secret-key-2026';
     const token = jwt.sign(
-      { userId: user.id, role: user.role, name: user.name },
+      { userId: user.id, role: user.role, name: user.name, shopId: user.shopId },
       secret,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as jwt.SignOptions
     );
@@ -49,6 +49,7 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
           name: user.name,
           username: user.username,
           role: user.role,
+          shopId: user.shopId,
           mustChangePassword: user.mustChangePassword,
         },
       },
@@ -69,7 +70,7 @@ export const getMe = async (req: Request, res: Response, next: NextFunction): Pr
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, name: true, username: true, role: true, isActive: true, mustChangePassword: true, createdAt: true },
+      select: { id: true, name: true, username: true, role: true, shopId: true, isActive: true, mustChangePassword: true, createdAt: true },
     });
 
     if (!user) {
@@ -183,6 +184,7 @@ export const setupCredentials = async (
         name: true,
         username: true,
         role: true,
+        shopId: true,
         isActive: true,
         mustChangePassword: true,
       },
@@ -190,7 +192,7 @@ export const setupCredentials = async (
 
     const secret = process.env.JWT_SECRET || 'pos-default-jwt-secret-key-2026';
     const token = jwt.sign(
-      { userId: updatedUser.id, role: updatedUser.role, name: updatedUser.name },
+      { userId: updatedUser.id, role: updatedUser.role, name: updatedUser.name, shopId: updatedUser.shopId },
       secret,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as jwt.SignOptions
     );

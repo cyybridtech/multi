@@ -55,6 +55,59 @@ enum RestockStatus {
   REJECTED
 }
 
+enum ShopInvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+model Shop {
+  id        Int      @id @default(autoincrement())
+  name      String
+  slug      String   @unique
+  ownerName String?  @map("owner_name")
+  phone     String?
+  email     String?
+  address   String?  @db.Text
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users           User[]
+  products        Product[]
+  customers       Customer[]
+  sales           Sale[]
+  notifications   Notification[]
+  smsQueue        SmsQueue[]
+  auditLogs       AuditLog[]
+  restockRequests RestockRequest[]
+  creditLedgers   CreditLedger[]
+  invitations     ShopInvitation[]
+
+  @@map("shops")
+}
+
+model ShopInvitation {
+  id           Int                  @id @default(autoincrement())
+  shopId       Int                  @map("shop_id")
+  createdById  Int                  @map("created_by_id")
+  tokenHash    String               @unique @map("token_hash")
+  role         Role
+  status       ShopInvitationStatus @default(PENDING)
+  expiresAt    DateTime             @map("expires_at")
+  acceptedAt   DateTime?            @map("accepted_at")
+  acceptedById Int?                 @map("accepted_by_id")
+  createdAt    DateTime             @default(now()) @map("created_at")
+
+  shop       Shop  @relation(fields: [shopId], references: [id])
+  createdBy  User  @relation("CreatedInvitations", fields: [createdById], references: [id])
+  acceptedBy User? @relation("AcceptedInvitations", fields: [acceptedById], references: [id])
+
+  @@index([shopId, status])
+  @@map("shop_invitations")
+}
+
 model User {
   id                 Int      @id @default(autoincrement())
   name               String
@@ -63,9 +116,11 @@ model User {
   role               Role
   isActive           Boolean  @default(true) @map("is_active")
   mustChangePassword Boolean  @default(false) @map("must_change_password")
+  shopId             Int?     @map("shop_id")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
+  shop             Shop?             @relation(fields: [shopId], references: [id])
   salesAsWorkerA   Sale[]           @relation("WorkerASales")
   salesAsWorkerB   Sale[]           @relation("WorkerBSales")
   deletedSales     Sale[]           @relation("SaleDeletions")
@@ -74,12 +129,16 @@ model User {
   notifications    Notification[]
   restockRequests  RestockRequest[] @relation("WorkerRestocks")
   reviewedRestocks RestockRequest[] @relation("AdminRestockReviews")
+  createdInvitations  ShopInvitation[] @relation("CreatedInvitations")
+  acceptedInvitations ShopInvitation[] @relation("AcceptedInvitations")
 
+  @@index([shopId])
   @@map("users")
 }
 
 model Product {
   id          Int      @id @default(autoincrement())
+  shopId      Int?     @map("shop_id")
   name        String
   brand       String?
   category    String
@@ -95,12 +154,15 @@ model Product {
 
   saleItems       SaleItem[]
   restockRequests RestockRequest[]
+  shop            Shop?             @relation(fields: [shopId], references: [id])
 
+  @@index([shopId])
   @@map("products")
 }
 
 model Customer {
   id           Int          @id @default(autoincrement())
+  shopId       Int?         @map("shop_id")
   name         String
   phone        String?
   email        String?
@@ -114,13 +176,16 @@ model Customer {
   sales        Sale[]
   creditLedger CreditLedger[]
   smsQueue     SmsQueue[]
+  shop         Shop?        @relation(fields: [shopId], references: [id])
 
+  @@index([shopId])
   @@map("customers")
 }
 
 model Sale {
   id             Int         @id @default(autoincrement())
-  customerId     Int         @map("customer_id")
+  shopId         Int?        @map("shop_id")
+  customerId     Int          @map("customer_id")
   workerAId      Int?        @map("worker_a_id")
   workerBId      Int?        @map("worker_b_id")
   status         SaleStatus  @default(BLUE)
@@ -148,7 +213,9 @@ model Sale {
   saleItems    SaleItem[]
   creditLedger CreditLedger?
   smsQueue     SmsQueue[]
+  shop         Shop?         @relation(fields: [shopId], references: [id])
 
+  @@index([shopId, saleDate])
   @@map("sales")
 }
 
@@ -171,6 +238,7 @@ model SaleItem {
 
 model CreditLedger {
   id          Int          @id @default(autoincrement())
+  shopId      Int?         @map("shop_id")
   customerId  Int          @map("customer_id")
   saleId      Int?         @unique @map("sale_id")
   totalAmount Decimal      @map("total_amount") @db.Decimal(10, 2)
@@ -185,7 +253,9 @@ model CreditLedger {
   customer Customer  @relation(fields: [customerId], references: [id])
   sale     Sale?     @relation(fields: [saleId], references: [id])
   payments Payment[]
+  shop     Shop?     @relation(fields: [shopId], references: [id])
 
+  @@index([shopId, status])
   @@map("credit_ledger")
 }
 
@@ -206,6 +276,7 @@ model Payment {
 
 model Notification {
   id            Int      @id @default(autoincrement())
+  shopId        Int?     @map("shop_id")
   type          String
   message       String   @db.Text
   isRead        Boolean  @default(false) @map("is_read")
@@ -216,12 +287,15 @@ model Notification {
   createdAt     DateTime @default(now()) @map("created_at")
 
   targetUser User? @relation(fields: [targetUserId], references: [id])
+  shop       Shop? @relation(fields: [shopId], references: [id])
 
+  @@index([shopId, createdAt])
   @@map("notifications")
 }
 
 model SmsQueue {
   id              Int       @id @default(autoincrement())
+  shopId          Int?      @map("shop_id")
   customerId      Int       @map("customer_id")
   saleId          Int?      @map("sale_id")
   message         String    @db.Text
@@ -232,12 +306,15 @@ model SmsQueue {
 
   customer Customer  @relation(fields: [customerId], references: [id])
   sale     Sale?     @relation(fields: [saleId], references: [id])
+  shop     Shop?     @relation(fields: [shopId], references: [id])
 
+  @@index([shopId, status])
   @@map("sms_queue")
 }
 
 model AuditLog {
   id         Int      @id @default(autoincrement())
+  shopId     Int?     @map("shop_id")
   userId     Int      @map("user_id")
   action     String
   entityType String   @map("entity_type")
@@ -248,13 +325,16 @@ model AuditLog {
   createdAt  DateTime @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id])
+  shop Shop? @relation(fields: [shopId], references: [id])
 
+  @@index([shopId, createdAt])
   @@map("audit_log")
 }
 
 model RestockRequest {
   id           Int           @id @default(autoincrement())
-  productId    Int           @map("product_id")
+  shopId       Int?          @map("shop_id")
+  productId    Int            @map("product_id")
   workerId     Int           @map("worker_id")
   quantity     Int
   notes        String?       @db.Text
@@ -266,6 +346,8 @@ model RestockRequest {
   product    Product @relation(fields: [productId], references: [id])
   worker     User    @relation("WorkerRestocks", fields: [workerId], references: [id])
   reviewedBy User?   @relation("AdminRestockReviews", fields: [reviewedById], references: [id])
+  shop       Shop?   @relation(fields: [shopId], references: [id])
 
+  @@index([shopId, status])
   @@map("restock_requests")
 }
