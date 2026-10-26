@@ -1,13 +1,16 @@
 # TiDB Cloud setup
 
-The `multi` repository is connected locally to a separate TiDB Cloud Starter instance named `multi`.
+The `multi` repository is connected locally to a separate TiDB Cloud Starter resource named `multi-pos`.
 
+- TiDB Cloud project: `multi`
+- Project ID: `1372813089454854961`
+- Resource: `multi-pos`
+- Instance ID: `10395628839807307820`
 - Plan: Starter
 - Compatibility: MySQL
 - Region: AWS Frankfurt (`eu-central-1`)
 - Spending limit: `$0/month`
 - Application database: `multi_pos`
-- Instance ID: `10232376094820984406`
 - Host: `gateway01.eu-central-1.prod.aws.tidbcloud.com`
 - Port: `4000`
 
