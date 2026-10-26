@@ -1,0 +1,235 @@
+import React, { useState } from "react";
+import { Bell, ChevronDown, Menu, LogOut, Smartphone } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "../../hooks/useAuth";
+import { useInstallApp } from "../../hooks/useInstallApp";
+import InstallAppModal from "../ui/InstallAppModal";
+import { useNotificationsStore } from "../../store/notifications.store";
+import api from "../../api/axios";
+import { formatDateTime } from "../../lib/utils";
+import type { Notification } from "../../types";
+
+interface HeaderProps {
+  onToggleSidebar?: () => void;
+  mobileSidebarOpen?: boolean;
+}
+
+const routeTitles: Record<string, string> = {
+  "/admin/dashboard": "Dashboard",
+  "/admin/sales": "Sales",
+  "/admin/customers": "Customers",
+  "/admin/products": "Products",
+  "/admin/credits": "Credits & Debts",
+  "/admin/sms-queue": "SMS Queue",
+  "/admin/users": "Users",
+  "/admin/audit-log": "Audit Log",
+  "/worker-a/sales": "Make a Sale",
+  "/worker-a/my-sales": "My Sales",
+  "/worker-a/products": "Products",
+  "/worker-a/customers": "Customers",
+  "/worker-b/confirm": "Confirm Sale",
+  "/worker-b/my-confirmations": "My Confirmations",
+};
+
+export function Header({ onToggleSidebar, mobileSidebarOpen = false }: HeaderProps) {
+  const { user, logout, isAdmin } = useAuth();
+  const { isInstalled, isIOS, hasNativePrompt, promptInstall } =
+    useInstallApp();
+  const [showInstallModal, setShowInstallModal] = useState(false);
+  const { count, decrement } = useNotificationsStore();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const {
+    data: notifications = [],
+    isLoading: loadingNotifications,
+    isError: notificationsError,
+    refetch: refetchNotifications,
+  } =
+    useQuery<Notification[]>({
+      queryKey: ["admin-notifications"],
+      queryFn: async () => {
+        const response = await api.get("/admin/notifications");
+        return response.data.data;
+      },
+      enabled: isAdmin && notificationsOpen,
+    });
+  const readNotification = useMutation({
+    mutationFn: (id: number) => api.patch(`/admin/notifications/${id}/read`),
+    onSuccess: () => {
+      decrement();
+      void queryClient.invalidateQueries({ queryKey: ["admin-notifications"] });
+    },
+  });
+
+  const pageTitle =
+    location.pathname === "/admin/sales" && new URLSearchParams(location.search).get("verified") === "true"
+      ? "Verified Sales"
+      : routeTitles[location.pathname] || "POS System";
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login", { replace: true });
+  };
+
+  return (
+    <>
+      <header className="pt-[env(safe-area-inset-top,0px)] bg-white border-b border-slate-200/80 shrink-0 shadow-sm z-30">
+        <div className="h-16 flex items-center justify-between px-3 sm:px-6">
+          {/* Mobile Menu Toggle & Page Title */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              className="md:hidden p-2 -ml-1 rounded-xl text-gray-600 hover:bg-slate-100 hover:text-gray-900 transition-colors"
+              aria-label="Open navigation menu"
+              aria-expanded={mobileSidebarOpen}
+              aria-controls="mobile-navigation"
+            >
+              <Menu size={22} />
+            </button>
+            <div>
+              <h1 className="text-base sm:text-lg font-extrabold tracking-tight text-slate-900 leading-tight">
+                {pageTitle}
+              </h1>
+              <p className="text-[11px] sm:text-xs text-slate-400">
+                {new Date().toLocaleDateString("en-GH", {
+                  weekday: "short",
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </p>
+            </div>
+          </div>
+
+          {/* Right side */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Install POS App to Home Screen Button */}
+            {!isInstalled && (
+              <button
+                onClick={() => promptInstall(() => setShowInstallModal(true))}
+                type="button"
+                title="Install POS App on your phone"
+                className="px-2.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-600/20 transition"
+              >
+                <Smartphone size={15} />
+                <span className="hidden sm:inline">Install App</span>
+              </button>
+            )}
+
+            {/* Notification Bell — Admin Only */}
+            {isAdmin && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setNotificationsOpen((open) => !open)}
+                  className="relative rounded-xl p-2 text-gray-500 transition-colors hover:bg-slate-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  title="Notifications"
+                  aria-label={count > 0 ? `Notifications, ${count} unread` : "Notifications"}
+                  aria-expanded={notificationsOpen}
+                  aria-controls="admin-notifications-popover"
+                >
+                  <Bell size={20} />
+                  {count > 0 && (
+                    <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
+                      {count > 9 ? "9+" : count}
+                    </span>
+                  )}
+                </button>
+                {notificationsOpen && (
+                  <div id="admin-notifications-popover" role="dialog" aria-label="Notifications" className="absolute right-0 top-12 z-50 w-[min(20rem,calc(100vw-1.5rem))] max-h-96 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl">
+                    <div className="border-b border-slate-100 px-4 py-3 font-semibold text-sm text-slate-800">
+                      Notifications
+                    </div>
+                    {loadingNotifications ? (
+                      <p className="px-4 py-6 text-sm text-slate-500">
+                        Loading notifications…
+                      </p>
+                    ) : notificationsError ? (
+                      <div className="px-4 py-6 text-sm text-red-600">
+                        <p>Notifications could not be loaded.</p>
+                        <button type="button" onClick={() => refetchNotifications()} className="mt-2 font-bold underline">Retry</button>
+                      </div>
+                    ) : notifications.length === 0 ? (
+                      <p className="px-4 py-6 text-sm text-slate-500">
+                        No notifications yet.
+                      </p>
+                    ) : (
+                      notifications.map((notification) => (
+                        <button
+                          type="button"
+                          key={notification.id}
+                          onClick={() => {
+                            if (!notification.isRead)
+                              readNotification.mutate(notification.id);
+                            setNotificationsOpen(false);
+                            if (
+                              notification.relatedEntity === "Sale" &&
+                              notification.relatedId
+                            ) {
+                              const deleted =
+                                notification.type === "SALE_DELETED";
+                              navigate(
+                                `/admin/sales?${deleted ? "deleted=true&" : ""}saleId=${notification.relatedId}`,
+                              );
+                            }
+                          }}
+                          className={`block w-full border-b border-slate-100 px-4 py-3 text-left hover:bg-slate-50 ${notification.isRead ? "opacity-70" : "bg-blue-50/50"}`}
+                        >
+                          <span className="block text-sm font-medium text-slate-800">
+                            {notification.message}
+                          </span>
+                          <span className="mt-1 block text-xs text-slate-400">
+                            {formatDateTime(notification.createdAt)}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* User Profile Info */}
+            <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-slate-200">
+              <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white text-sm font-extrabold shrink-0 shadow-sm">
+                {user?.name?.charAt(0).toUpperCase()}
+              </div>
+              <div className="hidden sm:block">
+                <p className="text-sm font-bold text-slate-800 leading-tight">
+                  {user?.name}
+                </p>
+                <p className="text-xs text-slate-400 leading-tight">
+                  {user?.role?.replace("_", " ")}
+                </p>
+              </div>
+
+              {/* Prominent Header Logout Button */}
+              <button
+                type="button"
+                onClick={handleLogout}
+                title="Sign Out"
+                className="ml-1 px-2.5 py-1.5 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all flex items-center gap-1.5 font-semibold text-xs border border-red-200 bg-red-50/80 shadow-xs"
+              >
+                <LogOut size={15} />
+                <span>Logout</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Install App Modal */}
+      <InstallAppModal
+        isOpen={showInstallModal}
+        onClose={() => setShowInstallModal(false)}
+        isIOS={isIOS}
+        hasNativePrompt={hasNativePrompt}
+        onNativeInstall={() => promptInstall()}
+      />
+    </>
+  );
+}
